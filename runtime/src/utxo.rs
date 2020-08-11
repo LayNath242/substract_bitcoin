@@ -43,9 +43,20 @@ pub struct Transaction {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as Utxo {
-
+		UtxoStore build(|config: &GenesisConfig| {
+            config.genesis_utxos
+                .iter()
+                .cloned()
+                .map(|u| (BlakeTwo256::hash_of(&u), u))
+                .collect::<Vec<_>>()
+        }): map hasher(identity) H256 => Option<TransactionOutput>;
 	}
+
+	add_extra_genesis {
+        config(genesis_utxos): Vec<TransactionOutput>;
+    }
 }
+
 
 // External functions: callable by the end user
 decl_module! {
@@ -60,6 +71,7 @@ decl_event! {
 
 	}
 }
+
 
 /// Tests for this module
 #[cfg(test)]
