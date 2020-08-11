@@ -72,6 +72,10 @@ decl_event! {
 	}
 }
 
+impl<T: Trait>Module<T>{
+
+}
+
 
 /// Tests for this module
 #[cfg(test)]
