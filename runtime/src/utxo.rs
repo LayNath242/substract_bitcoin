@@ -63,6 +63,16 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event() = default;
 
+		pub fn spend(_origin, transaction: Transaction) -> DispatchResult {
+		// 	// 1 TODO check transaction is valid
+
+		// 	// 2 write to storage
+			Self::update_storage(&transaction)?;
+
+		// 	// 3 emit success event
+			Ok(())
+		}
+
 	}
 }
 
