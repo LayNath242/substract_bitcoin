@@ -73,7 +73,23 @@ decl_event! {
 }
 
 impl<T: Trait>Module<T>{
+	fn update_storage(transaction: &Transaction) -> DispatchResult {
 
+		// 1. remove UTXO input from transaction
+		for input in &transaction.inputs {
+            <UtxoStore>::remove(input.outpoint);
+		}
+		
+		// 2. create th new UTXO in storage
+		let mut index: u64 = 0;
+		for output in &transaction.outputs {
+			let hash = BlakeTwo256::hash_of(&(&transaction.encode(), index));
+			index = index.checked_add(1).ok_or("output index overflow")?;
+			<UtxoStore>::insert(hash, output);
+		}
+
+		Ok(())
+	}
 }
 
 
