@@ -50,6 +50,8 @@ decl_storage! {
                 .map(|u| (BlakeTwo256::hash_of(&u), u))
                 .collect::<Vec<_>>()
 		}): map hasher(identity) H256 => Option<TransactionOutput>;
+
+		pub RewardTotal get(reward_total) : Value;
 	}
 
 	add_extra_genesis {
@@ -67,7 +69,8 @@ decl_module! {
 		// 	// 1 TODO check transaction is valid
 
 		// 	// 2 write to storage
-			Self::update_storage(&transaction)?;
+			let reward :Value = 0;
+			Self::update_storage(&transaction, reward)?;
 
 		// 	// 3 emit success event
 			Self::deposit_event(Event::TransactionSuccess(transaction));
@@ -85,7 +88,11 @@ decl_event! {
 }
 
 impl<T: Trait>Module<T>{
-	fn update_storage(transaction: &Transaction) -> DispatchResult {
+	fn update_storage(transaction: &Transaction, reward: Value) -> DispatchResult {
+		let new_total = <RewardTotal>.get()
+			.checked_add(reward)
+			.ok_or("reward index overflow")?;	
+		<RewardTotal>::put(new_total);
 
 		// 1. remove UTXO input from transaction
 		for input in &transaction.inputs {
