@@ -49,7 +49,7 @@ decl_storage! {
                 .cloned()
                 .map(|u| (BlakeTwo256::hash_of(&u), u))
                 .collect::<Vec<_>>()
-        }): map hasher(identity) H256 => Option<TransactionOutput>;
+		}): map hasher(identity) H256 => Option<TransactionOutput>;
 	}
 
 	add_extra_genesis {
@@ -70,6 +70,8 @@ decl_module! {
 			Self::update_storage(&transaction)?;
 
 		// 	// 3 emit success event
+			Self::deposit_event(Event::TransactionSuccess(transaction));
+
 			Ok(())
 		}
 
@@ -78,7 +80,7 @@ decl_module! {
 
 decl_event! {
 	pub enum Event {
-
+		TransactionSuccess(Transaction),
 	}
 }
 
