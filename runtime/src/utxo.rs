@@ -77,6 +77,14 @@ decl_module! {
 
 			Ok(())
 		}
+		
+		fn on_finalize() {
+			let auth: Vec<_> = Aura::authorities().iter().map(|x|{
+				let r: &Public = x.as_ref();
+				r.0.into()
+			}).collect();
+			Self::disperse_reward(&auth)
+		}
 
 	}
 }
@@ -89,7 +97,7 @@ decl_event! {
 
 impl<T: Trait>Module<T>{
 	fn update_storage(transaction: &Transaction, reward: Value) -> DispatchResult {
-		let new_total = <RewardTotal>.get()
+		let new_total = <RewardTotal>::get()
 			.checked_add(reward)
 			.ok_or("reward index overflow")?;	
 		<RewardTotal>::put(new_total);
@@ -108,6 +116,43 @@ impl<T: Trait>Module<T>{
 		}
 
 		Ok(())
+	}
+
+	fn disperse_reward(authorities: &[H256]){
+		// 1. divide reward fairly
+		let reward = <RewardTotal>::take();
+		let share_value : Value = reward
+			.checked_div(authorities.len() as Value)
+			.ok_or("no authorities")
+			.unwrap();
+
+		if share_value == 0 { return }
+
+		let remainder = reward
+			.checked_sub(share_value * authorities.len() as Value)
+			.ok_or("sub underflow")
+			.unwrap();
+
+		<RewardTotal>::put(remainder as Value);
+
+		//2. create utxo per validator
+
+		for authority in authorities {
+			let utxo = TransactionOutput{
+				value: share_value,
+				pubkey: *authority,
+			};
+			
+			let hash = BlakeTwo256::hash_of(&(&utxo,
+				<system::Module<T>>::block_number().saturated_into::<u64>()));
+			if !<UtxoStore>::contains_key(hash){
+				<UtxoStore>::insert(hash, utxo);
+				sp_runtime::print("Transaction reward sent to");
+				sp_runtime::print(hash.as_fixed_bytes() as &[u8]);
+			} else {
+				sp_runtime::print("Transaction reward wasted due to hash collission");
+			}
+		}
 	}
 }
 
