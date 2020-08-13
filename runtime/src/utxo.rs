@@ -300,32 +300,34 @@ mod tests {
 		ext
 	}
 
-	 #[test]
-    fn test_simple_transaction() {
-        new_test_ext().execute_with(|| {
-            let alice_pub_key = sp_io::crypto::sr25519_public_keys(SR25519)[0];
+	#[test]
+	fn test_sample_transaction() {
+		new_test_ext().execute_with(|| {
+			let alice_pub_key = sp_io::crypto::sr25519_public_keys(SR25519)[0];
 
-            // Alice wants to send herself a new utxo of value 50.
-            let mut transaction = Transaction {
-                inputs: vec![TransactionInput {
+
+			let mut transaction = Transaction {
+				inputs: vec![TransactionInput {
                     outpoint: H256::from(GENESIS_UTXO),
                     sigscript: H512::zero(),
                 }],
-                outputs: vec![TransactionOutput {
-                    value: 50,
-                    pubkey: H256::from(alice_pub_key),
-                }],
-            };
-            
-            let alice_signature = sp_io::crypto::sr25519_sign(SR25519, &alice_pub_key, &transaction.encode()).unwrap();
-            transaction.inputs[0].sigscript = H512::from(alice_signature);
-            let new_utxo_hash = BlakeTwo256::hash_of(&(&transaction.encode(), 0 as u64)); 
-            
-            assert_ok!(Utxo::spend(Origin::signed(0), transaction));
-            assert!(!UtxoStore::contains_key(H256::from(GENESIS_UTXO)));
-            assert!(UtxoStore::contains_key(new_utxo_hash));
-            assert_eq!(50, UtxoStore::get(new_utxo_hash).unwrap().value);
-        });
-    }
+				outputs: vec![TransactionOutput {
+					value: 50,
+					pubkey: H256::from(alice_pub_key),
+				}],
+			};
+			let alice_signature = sp_io::crypto::sr25519_sign(SR25519, &alice_pub_key, &transaction.encode()).unwrap();
+			transaction.inputs[0].sigscript = H512::from(alice_signature);
+			let new_utxo_hash = BlakeTwo256::hash_of(&(&transaction.encode(), 0 as u64));
+
+			// // 1 spend we be ok
+			assert_ok!(Utxo::spend(Origin::signed(0), transaction));
+			// // 2.old UTXO is go
+			assert!(!UtxoStore::contains_key(H256::from(GENESIS_UTXO)));
+			// //3. utxo exist value == 50
+			assert!(UtxoStore::contains_key(new_utxo_hash));
+			assert_eq!(UtxoStore::get(new_utxo_hash).unwrap().value, 50);
+		});
+	}
 
 }
