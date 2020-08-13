@@ -67,9 +67,9 @@ decl_module! {
 
 		pub fn spend(_origin, transaction: Transaction) -> DispatchResult {
 		// 	// 1 TODO check transaction is valid
-
+			let reward = Self::validate_transaction(&transaction)?;
 		// 	// 2 write to storage
-			let reward :Value = 0;
+		// let reward: Value = 0;
 			Self::update_storage(&transaction, reward)?;
 
 		// 	// 3 emit success event
@@ -96,6 +96,66 @@ decl_event! {
 }
 
 impl<T: Trait>Module<T>{
+	pub fn get_sample_transaction(transaction: &Transaction) -> Vec<u8> {
+		let mut trx = transaction.clone();
+		for input in trx.inputs.iter_mut() {
+			input.sigscript = H512::zero()
+		}
+		trx.encode()
+	}
+
+	pub fn validate_transaction(transaction: &Transaction) -> Result<Value,  &'static str> {
+		let reward: Value = 0;
+	// 	// let copy over our list of security checks that we need to implement here
+	// 	//1. make sure that input and output not empty
+		ensure!(!transaction.inputs.is_empty(), "no inputs");
+		ensure!(!transaction.outputs.is_empty(), "no outputs");
+
+	// 	// 2. Each input exit and is use exactly once
+	// 	// 3. Each output is defined exactly one and has noonzero value
+
+        {
+            let input_set: BTreeMap<_, ()> =transaction.inputs.iter().map(|input| (input, ())).collect();
+            ensure!(input_set.len() == transaction.inputs.len(), "each input must only be used once");
+        }
+        {
+            let output_set: BTreeMap<_, ()> = transaction.outputs.iter().map(|output| (output, ())).collect();
+            ensure!(output_set.len() == transaction.outputs.len(), "each output must be defined only once");
+		}
+
+		let simple_transaction = Self::get_sample_transaction(transaction);
+		let mut total_output:Value = 0;
+		let mut total_input: Value = 0;
+		let mut output_index: u64 = 0;
+
+	// 	// Check that inputs are valid
+		for input in transaction.inputs.iter() {
+            if let Some(input_utxo) = <UtxoStore>::get(&input.outpoint) {
+                ensure!(sp_io::crypto::sr25519_verify(
+                    &Signature::from_raw(*input.sigscript.as_fixed_bytes()),
+                    &simple_transaction,
+                    &Public::from_h256(input_utxo.pubkey)
+				), "signature must be valid" );
+				total_input = total_input.checked_add(input_utxo.value).ok_or("input value overflow")?;
+			} else {
+			}
+		}
+		
+	// 	// Check that outputs are valid
+        for output in transaction.outputs.iter() {
+            ensure!(output.value > 0, "output value must be nonzero");
+            let hash = BlakeTwo256::hash_of(&(&transaction.encode(), output_index));
+            output_index = output_index.checked_add(1).ok_or("output index overflow")?;
+            ensure!(!<UtxoStore>::contains_key(hash), "output already exists");
+            total_output = total_output.checked_add(output.value).ok_or("output value overflow")?;
+		}
+		
+		ensure!( total_input >= total_output, "output value must not exceed input value");
+        let reward = total_input.checked_sub(total_output).ok_or("reward underflow")?;
+
+		Ok(reward)
+	}
+
 	fn update_storage(transaction: &Transaction, reward: Value) -> DispatchResult {
 		let new_total = <RewardTotal>::get()
 			.checked_add(reward)
