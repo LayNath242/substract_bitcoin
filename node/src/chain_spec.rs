@@ -68,6 +68,11 @@ impl Alternative {
 						get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
 						get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
 					],
+					// Genesis set of pubkeys that own UTXOs
+					vec![
+						get_from_seed::<sr25519::Public>("Alice"),
+						get_from_seed::<sr25519::Public>("Bob"),
+					],
 					true,
 				),
 				vec![],
@@ -99,7 +104,6 @@ impl Alternative {
 						get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
 						get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 					],
-					// Genesis set of pubkeys that own UTXOs
 					vec![
 						get_from_seed::<sr25519::Public>("Alice"),
 						get_from_seed::<sr25519::Public>("Bob"),
@@ -125,18 +129,17 @@ impl Alternative {
 }
 
 fn testnet_genesis(
-	initial_authorities: Vec<(AuraId, GrandpaId)>,
-	root_key: AccountId,
-	endowed_accounts: Vec<AccountId>,
-	endowed_utxos: Vec<sr25519::Public>,
-	_enable_println: bool
-) -> GenesisConfig {
-	
-	GenesisConfig {
-		system: Some(SystemConfig {
-			code: WASM_BINARY.to_vec(),
-			changes_trie_config: Default::default(),
-		}),
+    initial_authorities: Vec<(AuraId, GrandpaId)>,
+    root_key: AccountId,
+    endowed_accounts: Vec<AccountId>,
+    endowed_utxos: Vec<sr25519::Public>,
+    _enable_println: bool) -> GenesisConfig 
+{
+    GenesisConfig {
+      system: Some(SystemConfig {
+        code: WASM_BINARY.to_vec(),
+        changes_trie_config: Default::default(),
+      }),
 		balances: Some(BalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
 		}),
@@ -150,14 +153,14 @@ fn testnet_genesis(
 			key: root_key,
 		}),
 		utxo: Some(utxo::GenesisConfig {
-        genesis_utxos: endowed_utxos
-                      .iter()
-                      .map(|x|
-                        utxo::TransactionOutput {
-                          value: 100 as utxo::Value,
-                          pubkey: H256::from_slice(x.as_slice()),
-                      })
-                      .collect()
+			genesis_utxos: endowed_utxos
+				.iter()
+				.map(|x|
+					utxo::TransactionOutput {
+					value: 100 as utxo::Value,
+					pubkey: H256::from_slice(x.as_slice()),
+				})
+				.collect()
       }),
 	}
 }
