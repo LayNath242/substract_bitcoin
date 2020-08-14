@@ -354,4 +354,24 @@ impl_runtime_apis! {
 			Grandpa::grandpa_authorities()
 		}
 	}
+
+	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
+        fn validate_transaction(tx: <Block as BlockT>::Extrinsic) -> TransactionValidity {            
+            // Extrinsics representing UTXO transaction need some special handling
+            if let Some(&utxo::Call::spend(ref transaction)) = IsSubType::<utxo::Module<Runtime>, Runtime>::is_sub_type(&tx.function) {
+                match <utxo::Module<Runtime>>::validate_transaction(&transaction) {
+                    // Transaction verification failed
+                    Err(e) => {
+                        sp_runtime::print(e);
+                        return Err(TransactionValidityError::Invalid(InvalidTransaction::Custom(1)));
+                    }
+                    // Race condition, or Transaction is good to go
+                    Ok(tv) => { return Ok(tv); }
+                }                
+            }
+
+            // Fall back to default logic for non UTXO::execute extrinsics
+            Executive::validate_transaction(tx)
+        }
+    }
 }

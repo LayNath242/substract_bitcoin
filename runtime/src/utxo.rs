@@ -67,10 +67,10 @@ decl_module! {
 
 		pub fn spend(_origin, transaction: Transaction) -> DispatchResult {
 		// 	// 1 TODO check transaction is valid
-			let reward = Self::validate_transaction(&transaction)?;
+			let transaction_validity = Self::validate_transaction(&transaction)?;
 		// 	// 2 write to storage
 		// let reward: Value = 0;
-			Self::update_storage(&transaction, reward)?;
+			Self::update_storage(&transaction, transaction_validity.priority as u128)?;
 
 		// 	// 3 emit success event
 			Self::deposit_event(Event::TransactionSuccess(transaction));
@@ -104,7 +104,7 @@ impl<T: Trait>Module<T>{
 		trx.encode()
 	}
 
-	pub fn validate_transaction(transaction: &Transaction) -> Result<Value,  &'static str> {
+	pub fn validate_transaction(transaction: &Transaction) -> Result<ValidTransaction,  &'static str> {
 		let reward: Value = 0;
 	// 	// let copy over our list of security checks that we need to implement here
 	// 	//1. make sure that input and output not empty
@@ -128,7 +128,11 @@ impl<T: Trait>Module<T>{
 		let mut total_input: Value = 0;
 		let mut output_index: u64 = 0;
 
-	// 	// Check that inputs are valid
+		let mut missing_utxos = Vec::new();
+		let mut new_utxos = Vec::new();
+        let mut _reward = 0;
+
+	 // Check that inputs are valid
 		for input in transaction.inputs.iter() {
             if let Some(input_utxo) = <UtxoStore>::get(&input.outpoint) {
                 ensure!(sp_io::crypto::sr25519_verify(
@@ -138,6 +142,7 @@ impl<T: Trait>Module<T>{
 				), "signature must be valid" );
 				total_input = total_input.checked_add(input_utxo.value).ok_or("input value overflow")?;
 			} else {
+				missing_utxos.push(input.outpoint.clone().as_fixed_bytes().to_vec());
 			}
 		}
 		
@@ -147,13 +152,22 @@ impl<T: Trait>Module<T>{
             let hash = BlakeTwo256::hash_of(&(&transaction.encode(), output_index));
             output_index = output_index.checked_add(1).ok_or("output index overflow")?;
             ensure!(!<UtxoStore>::contains_key(hash), "output already exists");
-            total_output = total_output.checked_add(output.value).ok_or("output value overflow")?;
+			total_output = total_output.checked_add(output.value).ok_or("output value overflow")?;
+			new_utxos.push(hash.as_fixed_bytes().to_vec());
+		}
+		if missing_utxos.is_empty() {
+			ensure!( total_input >= total_output, "output value must not exceed input value");
+        	_reward = total_input.checked_sub(total_output).ok_or("reward underflow")?;
 		}
 		
-		ensure!( total_input >= total_output, "output value must not exceed input value");
-        let reward = total_input.checked_sub(total_output).ok_or("reward underflow")?;
 
-		Ok(reward)
+		Ok(ValidTransaction{
+			requires: missing_utxos,
+            provides: new_utxos,
+            priority: reward as u64,
+            longevity: TransactionLongevity::max_value(),
+            propagate: true,
+		})
 	}
 
 	fn update_storage(transaction: &Transaction, reward: Value) -> DispatchResult {
