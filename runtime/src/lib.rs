@@ -245,7 +245,7 @@ construct_runtime!(
 		Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: transaction_payment::{Module, Storage},
 		Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
-		Utxo: utxo::{Module, Call, Storage, Event},
+		Utxo: utxo::{Module, Call, Config, Storage, Event},
 	}
 );
 
